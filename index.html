@@ -1149,7 +1149,7 @@ const defaultEmployees = [];
    A anon key é pública. Nunca coloque service_role no front-end.
 */
 const SUPABASE_URL = "https://vohvdkugywfpobyizlnu.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_N7-ccz1aAtmUGi9EeobJYA_SZ56b63W";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvaHZka3VneXdmcG9ieWl6bG51Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NDQ3MDUsImV4cCI6MjA5NjAyMDcwNX0.Mt5CcjFwg63LSghJQBBZ02vcWDDEiiqr0mrdFBWhHXI";
 // Configurado para o projeto Supabase jsa-auto. A chave abaixo é publishable/public, segura para front-end.
 const backendReady = SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 20;
 const db = backendReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -1167,13 +1167,33 @@ function profileToEmployee(profile){
 
 async function getProfileById(userId){
   if(!db || !userId) return null;
+
+  const { data: authData } = await db.auth.getUser();
+  const userEmail = (authData?.user?.email || "").trim().toLowerCase();
+
+  const filters = [
+    `id.eq.${userId}`,
+    `user_id.eq.${userId}`,
+    `auth_id.eq.${userId}`,
+    `uid.eq.${userId}`
+  ];
+
+  if(userEmail){
+    filters.push(`email.eq.${userEmail}`);
+  }
+
   const { data, error } = await db
     .from("profiles")
-    .select("id,name,email,recovery,role,active")
-    .eq("id", userId)
+    .select("id,user_id,auth_id,uid,nome,name,email,email_recuperacao,recovery,funcao,role,ativo,active")
+    .or(filters.join(","))
+    .limit(1)
     .maybeSingle();
 
-  if(error) throw error;
+  if(error){
+    console.error("Erro ao buscar perfil no Supabase:", error);
+    throw error;
+  }
+
   return data ? profileToEmployee(data) : null;
 }
 
@@ -1181,7 +1201,7 @@ async function loadEmployeesFromBackend(){
   if(!db || !currentUser) return [];
   const { data, error } = await db
     .from("profiles")
-    .select("id,name,email,recovery,role,active")
+    .select("id,user_id,auth_id,uid,nome,name,email,email_recuperacao,recovery,funcao,role,ativo,active")
     .order("name", { ascending:true });
 
   if(error){
