@@ -1182,7 +1182,7 @@ async function getProfileById(userId){
     filters.push(`email.eq.${userEmail}`);
   }
 
-  const { data, error } = await db
+  let { data, error } = await db
     .from("profiles")
     .select("id,user_id,auth_id,uid,nome,name,email,email_recuperacao,recovery,funcao,role,ativo,active")
     .or(filters.join(","))
@@ -1191,7 +1191,22 @@ async function getProfileById(userId){
 
   if(error){
     console.error("Erro ao buscar perfil no Supabase:", error);
-    throw error;
+  }
+
+  if(!data && userEmail){
+    const result = await db
+      .from("profiles")
+      .select("id,user_id,auth_id,uid,nome,name,email,email_recuperacao,recovery,funcao,role,ativo,active")
+      .eq("email", userEmail)
+      .limit(1)
+      .maybeSingle();
+
+    data = result.data;
+    error = result.error;
+
+    if(error){
+      console.error("Erro ao buscar perfil por e-mail no Supabase:", error);
+    }
   }
 
   return data ? profileToEmployee(data) : null;
@@ -1411,6 +1426,24 @@ const Auth = {
       profile = await getProfileById(data.user.id);
     }catch(e){
       console.error(e);
+    }
+
+    if(!profile && (data.user.email || "").trim().toLowerCase() === "autojsa43@gmail.com"){
+      profile = {
+        id: data.user.id,
+        user_id: data.user.id,
+        auth_id: data.user.id,
+        uid: data.user.id,
+        name: "Administrador JSA Auto",
+        nome: "Administrador JSA Auto",
+        email: data.user.email,
+        recovery: data.user.email,
+        email_recuperacao: data.user.email,
+        role: "admin",
+        funcao: "admin",
+        active: true,
+        ativo: true
+      };
     }
 
     if(!profile){
